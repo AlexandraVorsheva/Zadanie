@@ -1,0 +1,63 @@
+# Задание 1, Вариант 5
+# Воршева Александра – для региона 75 (Забайкалье, Чита) рассчитайте урожайность пшеницы в 2010 году,
+setwd ("C:/R") #указываем рабочую директорию
+getwd() #проверяем рабочую директорию
+# взяв для рассчета средние суммы активных температур за предыдущие 15 лет, с 23 ближайших метеостанций
+library(tidyverse)
+library(rnoaa)
+library(lubridate)
+
+#Данные для расчета:
+ai = c(0.00,0.00,0.00,32.11, 26.31,25.64,23.20,18.73,16.30,13.83,0.00,0.00)
+bi = c(0.00, 0.00, 0.00, 11.30, 9.26, 9.03,8.16, 6.59, 5.73, 4.87, 0.00, 0.00)
+di = c(0.00,0.00, 0.00, 0.33, 1.00, 1.00, 1.00, 0.32, 0.00, 0.00, 0.00, 0.00)
+#
+Kf = 300 #  Коэффициент использования ФАР
+Qj = 1600 # калорийность урожая культуры
+Lj = 2.2 #  сумма частей основной и побочной продукции
+Ej = 25 #   стандартная влажность культуры
+
+#station_data = ghcnd_stations()
+#write.csv(station_data, "station_data.csv")
+station_data = read.csv("station_data.csv")
+# Получим список метеостанций
+chita = data.frame(id = "CHITA", latitude = 52.051824,  longitude = 113.470753)
+chita_around = meteo_nearby_stations(lat_lon_df = chita, station_data = station_data,
+                                     limit = 23, var = "TAVG", 
+                                     #лимит - 23 ближайших станций
+                                     year_min = 1995, year_max = 2010)
+# объединим данные по всем метеостанциям
+all_data = tibble()
+for (i in 1:23)
+{
+  chita_id = chita_around[["CHITA"]][["id"]][i]
+  #
+  data = meteo_tidy_ghcnd(stationid = chita_id,
+                          var="TAVG",
+                          date_min="1995-01-01",
+                          date_max="2010-12-31")
+  all_data = bind_rows(all_data, data)
+}
+# произведем обработку полученных данных
+clean_data = tibble()
+for (m in 1:12)
+{
+  clean_data = bind_rows(clean_data,
+                         all_data %>% 
+                           # создадим колонки year и month для группировки
+                           mutate(year = year(date), month = month(date)) %>%
+                           filter(month == m) %>%
+                           group_by(year, month, id) %>%
+                           # суммирования
+                           summarize(tavg = sum(tavg[tavg>50])/10) %>%
+                           group_by(month) %>%
+                           # нахождения средних месячных активных температур:
+                           summarize(s = mean(tavg, na.rm = TRUE)) %>%
+                           # создадим колонки для расчета:
+                           mutate (a = ai[m], b = bi[m], d = di[m]) %>%
+                           # и рассчитаем урожайность для каждого месяца:
+                           mutate (fert = ((a + b * 1.0 * s) * d * Kf) / (Qj * Lj * (100-Ej)) )
+  )
+}
+# сумма урожайностей равна:
+Yield = sum(clean_data$fert); Yield
