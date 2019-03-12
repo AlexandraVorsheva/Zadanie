@@ -39,25 +39,18 @@ for (i in 1:23)
   all_data = bind_rows(all_data, data)
 }
 # произведем обработку полученных данных
-clean_data = tibble()
-for (m in 1:12)
-{
-  clean_data = bind_rows(clean_data,
-                         all_data %>% 
-                           # создадим колонки year и month для группировки
-                           mutate(year = year(date), month = month(date)) %>%
-                           filter(month == m) %>%
-                           group_by(year, month, id) %>%
-                           # суммирования
-                           summarize(tavg = sum(tavg[tavg>50])/10) %>%
-                           group_by(month) %>%
-                           # нахождения средних месячных активных температур:
-                           summarize(s = mean(tavg, na.rm = TRUE)) %>%
-                           # создадим колонки для расчета:
-                           mutate (a = ai[m], b = bi[m], d = di[m]) %>%
-                           # и рассчитаем урожайность для каждого месяца:
-                           mutate (fert = ((a + b * 1.0 * s) * d * Kf) / (Qj * Lj * (100-Ej)) )
-  )
-}
+new_data = all_data %>% 
+# создадим колонки year и month для группировки...
+mutate(year = year(date), month = month(date)) %>%
+group_by(year, month, id) %>%
+# суммирования
+summarize(tavg = sum(tavg[tavg>50], na.rm=TRUE)/10) %>%
+group_by(month) %>%
+# нахождения средних месячных активных температур:
+summarize(s = mean(tavg, na.rm = TRUE)) %>%
+# создадим колонки для расчета:
+mutate (a = ai, b = bi, d = di) %>%
+# и рассчитаем урожайность для каждого месяца:
+mutate (fert = ((a + b * 1.0 * s) * d * Kf) / (Qj * Lj * (100-Ej)) )
 # сумма урожайностей равна:
-Yield = sum(clean_data$fert); Yield
+Yield = sum(new_data$fert); Yield
